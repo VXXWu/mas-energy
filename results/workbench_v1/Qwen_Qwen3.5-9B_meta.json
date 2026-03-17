@@ -1,0 +1,24 @@
+{
+  "model": "Qwen/Qwen3.5-9B",
+  "model_key": "toy",
+  "architecture": "dense",
+  "gpu_name": "NVIDIA RTX 6000 Ada Generation",
+  "start_time": "2026-03-17T00:32:38.498309",
+  "args": {
+    "model": "toy",
+    "benchmarks": [
+      "workbench"
+    ],
+    "topologies": [
+      "hybrid"
+    ],
+    "n_tasks": 50,
+    "n_reps": 1,
+    "max_react_steps": 20,
+    "gpu_index": 0,
+    "output_dir": "/atlas2/u/vincewu8/mas_project/mas-energy/results/workbench_v1",
+    "sglang_url": "http://localhost:30004/v1",
+    "workbench_path": "/atlas2/u/vincewu8/mas_project/WorkBench"
+  },
+  "idle_power_watts": 33.2423
+}

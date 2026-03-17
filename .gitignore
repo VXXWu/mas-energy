@@ -1,0 +1,7 @@
+# local saved files
+logs/
+analysis/
+python_checks.md
+results/pareto/
+results/pareto_v2/
+results/pareto_v3/

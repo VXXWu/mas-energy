@@ -1,0 +1,50 @@
+#!/bin/bash
+#SBATCH --job-name=mas-q27b
+#SBATCH --account=atlas
+#SBATCH --partition=atlas
+#SBATCH --qos=normal
+#SBATCH --gres=gpu:1
+#SBATCH --constraint=48G
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=48G
+#SBATCH --time=7-00:00:00
+#SBATCH --output=/atlas2/u/%u/mas_project/mas-energy/logs/qwen35_27b_%j.out
+#SBATCH --error=/atlas2/u/%u/mas_project/mas-energy/logs/qwen35_27b_%j.err
+
+set -e
+source /sailhome/$USER/.bashrc
+conda activate mas-energy
+export HF_HOME=/atlas2/u/$USER/mas_project/hf_cache
+
+BENCHMARK=${1:-workbench}
+echo "=== Qwen3.5-27B (Dense) — ${BENCHMARK} ==="
+echo "Node: $(hostname), GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader)"
+
+python -m sglang.launch_server \
+    --model-path Qwen/Qwen3.5-27B-GPTQ-Int4 \
+    --port 30000 \
+    --tp 1 \
+    --quantization gptq \
+    --mem-fraction-static 0.80 \
+    --context-length 32768 \
+    --tool-call-parser qwen3_coder \
+    --trust-remote-code \
+--host 0.0.0.0 &
+SGLANG_PID=$!
+
+for i in $(seq 1 120); do
+    curl -s http://localhost:30000/health > /dev/null 2>&1 && break
+    sleep 2
+done
+
+cd /atlas2/u/$USER/mas_project/mas-energy/code
+python run_experiments.py \
+    --model qwen35-27b \
+    --benchmarks ${BENCHMARK} \
+    --topologies sas independent centralized decentralized hybrid \
+    --n-reps 5 \
+    --output-dir /atlas2/u/$USER/mas_project/mas-energy/results/main \
+    --workbench-path /atlas2/u/$USER/mas_project/WorkBench
+
+kill $SGLANG_PID 2>/dev/null
+wait $SGLANG_PID 2>/dev/null
