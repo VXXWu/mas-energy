@@ -14,6 +14,10 @@
 set -e
 source /sailhome/$USER/.bashrc
 conda activate mas-energy
+# Self-heal env drift: jinja2 3.0.3 breaks SGLang's --tool-call-parser path
+# (transformers' apply_chat_template needs jinja2>=3.1). Pinned + --no-deps per project memory.
+python -c "import jinja2; assert tuple(map(int, jinja2.__version__.split('.')[:2])) >= (3, 1)" 2>/dev/null \
+    || pip install 'jinja2>=3.1.4,<3.2' --no-deps --quiet
 export HF_HOME=/atlas2/u/$USER/mas_project/hf_cache
 
 echo "=== MAS Energy Pilot ==="
@@ -27,7 +31,7 @@ python -m sglang.launch_server \
     --port 30000 \
     --tp 1 \
     --mem-fraction-static 0.85 \
-    --context-length 32768 \
+    --context-length 131072 \
     --tool-call-parser qwen3_coder \
     --trust-remote-code \
 --host 0.0.0.0 &

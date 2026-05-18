@@ -1381,18 +1381,53 @@ WORKBENCH_TOOLS = [
 
 def load_benchmark(name, repo_path=None, **kwargs):
     """Factory for benchmark instances."""
-    if name == "workbench":
+    if name == "fanoutqa":
+        from benchmarks_fanoutqa import FanOutQABenchmark
+        return FanOutQABenchmark()
+    elif name == "workbench":
         if not repo_path:
             repo_path = os.environ.get(
                 "WORKBENCH_PATH",
                 os.path.expanduser("~/WorkBench"),
             )
         return WorkBenchBenchmark(repo_path)
+    elif name == "qampari":
+        from benchmarks_qampari import QampariBenchmark
+        data_dir = kwargs.get("data_dir")
+        return QampariBenchmark(data_dir=data_dir)
+    elif name == "maslegalbench":
+        from benchmarks_maslegalbench import MASLegalBenchmark
+        data_dir = kwargs.get("data_dir")
+        return MASLegalBenchmark(data_dir=data_dir)
     elif name == "browsecomp_plus":
-        raise NotImplementedError(
-            "BrowseComp-Plus not yet implemented. "
-            "Requires Qwen3-Embed-8B retriever setup."
-        )
+        from benchmarks_browsecomp import BrowseCompBenchmark
+        data_dir = kwargs.get("data_dir")
+        cache_dir = kwargs.get("cache_dir")
+        return BrowseCompBenchmark(data_dir=data_dir, cache_dir=cache_dir)
+    elif name == "swebench":
+        from benchmarks_swebench import SWEBenchBenchmark
+        repos_dir = kwargs.get("repos_dir")
+        return SWEBenchBenchmark(repos_dir=repos_dir)
+    elif name == "swebench_batched":
+        from benchmarks_swebench_batched import SWEBenchBatchedBenchmark
+        repos_dir = kwargs.get("repos_dir")
+        return SWEBenchBatchedBenchmark(repos_dir=repos_dir)
+    elif name == "math":
+        from benchmarks_math import MATHBenchmark
+        levels = kwargs.get("math_levels") or ("Level 5",)
+        return MATHBenchmark(levels=tuple(levels))
+    elif name == "humaneval":
+        from benchmarks_humaneval import HumanEvalBenchmark
+        return HumanEvalBenchmark()
+    elif name == "livecodebench":
+        from benchmarks_livecodebench import LiveCodeBenchBenchmark
+        return LiveCodeBenchBenchmark()
+    elif name == "predictability":
+        from benchmarks_predictability import PredictabilityBenchmark
+        return PredictabilityBenchmark()
+    elif name == "bigcodebench":
+        from benchmarks_bigcodebench import BigCodeBenchBenchmark
+        return BigCodeBenchBenchmark()
     elif name == "plancraft":
         raise NotImplementedError(
             "PlanCraft not yet implemented. "

@@ -1,3 +1,5 @@
+import os
+
 # --- Models ---
 # Three ~30B models: 2x MoE (3B active), 1x Dense (27B active)
 # All run in non-thinking mode by default (matches Kim et al.)
@@ -50,19 +52,38 @@ TOY_MODEL = {
 # --- Topologies (Kim et al. 2025 taxonomy) ---
 TOPOLOGIES = ["sas", "independent", "centralized", "decentralized", "hybrid"]
 
-# --- Benchmarks (all agentic, spanning parallelizable → sequential) ---
-BENCHMARKS = ["workbench", "browsecomp_plus", "plancraft"]
-# LocalSearchBench replacement TBD — needs offline parallelizable benchmark
+# --- Benchmarks (all agentic, spanning parallelizable → sequential → reasoning) ---
+BENCHMARKS = ["qampari", "workbench", "browsecomp_plus", "plancraft", "math"]
+# qampari: list-answer QA with breadth bottleneck (parallelizable retrieval)
+# workbench: 16-tool procedural benchmark (stateful tool composition)
+# browsecomp_plus: deep retrieval over 100K corpus
+# plancraft: sequential planning (negative control)
+# math: Hendrycks MATH Level-5 with stateful Python interpreter
+# (reasoning-heavy; fills the Du et al. debate-helps gap left by retrieval-only matrix)
 
-# --- Experiment parameters ---
+# --- Experiment parameters (Kim et al. 2025 defaults) ---
 N_AGENTS = 3           # M=3 (Du et al. standard; Kim et al. primary)
-N_ROUNDS = 2           # coordination/debate rounds
-N_PEER_ROUNDS = 1      # peer debate rounds within each orchestrator round (Hybrid only)
-MAX_PEER_STEPS = 10    # max ReAct steps per peer debate round
 N_REPS = 5             # repetitions per config (Wilcoxon n>=5)
 N_WARMUP = 5           # warmup calls before measurement
 MAX_TOKENS = 4096      # per-call generation limit (agentic tasks need more)
-MAX_REACT_STEPS = 20   # max tool-calling steps per ReAct loop
+MAX_REACT_STEPS = 10   # SAS/Independent max iterations (Kim: "max 10 iterations")
+
+# Per-topology structure (Kim et al. 2025, Table 2 / Appendix A)
+# With early stopping: rounds are a max cap (agents stop when converged),
+# and per-round step budget matches SAS so agents can do as much work as needed.
+# Centralized: "3 sub-agents, 1 orchestrator, max 5 rounds"
+CENTRALIZED_ROUNDS = 5
+CENTRALIZED_WORKER_STEPS = MAX_REACT_STEPS  # let workers use as many steps as needed
+
+# Decentralized: "3 agents, 3 debate rounds"
+# Round count is 2 (not 3) because the initial independent phase counts as round 1
+DECENTRALIZED_ROUNDS = 2
+DECENTRALIZED_DEBATE_STEPS = MAX_REACT_STEPS  # let debaters use as many steps as needed
+
+# Hybrid: centralized structure + limited peer communication
+HYBRID_ROUNDS = 5                       # max orchestration rounds (early stop applies)
+HYBRID_WORKER_STEPS = MAX_REACT_STEPS   # let workers use as many steps as needed
+N_PEER_ROUNDS = 1                       # peer debate rounds per orchestrator round
 
 # --- Temperature ---
 # T>0 critical for MAS diversity; T=0 makes agents identical → debate is a no-op
@@ -78,7 +99,16 @@ SGLANG_PORT = 30000
 SGLANG_URL = f"http://localhost:{SGLANG_PORT}/v1"
 SGLANG_API_KEY = "EMPTY"
 SGLANG_MEM_FRACTION = 0.80
-SGLANG_CONTEXT_LENGTH = 32768
+SGLANG_CONTEXT_LENGTH = int(os.environ.get(
+    "SGLANG_CONTEXT_LENGTH", 131072
+))  # A6000: 131072, A5000: 49152 (set via env var in sbatch)
+
+# --- Transcript logging ---
+# When True, every LLM call's request messages and response content are
+# attached to the call_record metadata for downstream inspection. This grows
+# result file size ~10x and is intended only for spot-check / debug runs.
+# Toggled by --save-transcripts in run_experiments.py (sets MAS_SAVE_TRANSCRIPTS env).
+SAVE_TRANSCRIPTS = bool(int(os.environ.get("MAS_SAVE_TRANSCRIPTS", "0")))
 
 # --- Cluster paths (Stanford SC / atlas) ---
 CLUSTER_STORAGE = "/atlas2/u"       # /atlas2/u/$USER/

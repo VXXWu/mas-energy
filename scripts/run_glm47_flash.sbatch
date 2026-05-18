@@ -28,7 +28,7 @@ python -m sglang.launch_server \
     --tp 1 \
     --attention-backend triton \
     --mem-fraction-static 0.80 \
-    --context-length 32768 \
+    --context-length 131072 \
     --tool-call-parser glm47 \
     --trust-remote-code \
     --host 0.0.0.0 &
