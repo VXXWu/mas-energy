@@ -5,3 +5,5 @@ python_checks.md
 results/pareto/
 results/pareto_v2/
 results/pareto_v3/
+# Cluster sbatch scripts (infrastructure, not paper code)
+scripts/
