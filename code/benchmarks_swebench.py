@@ -308,6 +308,29 @@ class SWEBenchBenchmark:
                 pass
             shutil.rmtree(work_dir, ignore_errors=True)
 
+            # Scrub site-packages of .pth / .egg-link files pointing into the
+            # just-removed worktree. SWE-bench tasks sometimes run `pip install -e .`
+            # inside the worktree (notably swe_psf__requests tasks where the package
+            # under test IS `requests`), which writes a .pth file in site-packages
+            # pointing at the worktree dir. Without this scrub, the next job's
+            # `import requests` finds the stale .pth, tries to load from a removed
+            # path, and crashes with ModuleNotFoundError (or worse, loads a
+            # Python-2-era requests that breaks on `from collections import Mapping`).
+            try:
+                import site
+                for sp_str in site.getsitepackages():
+                    sp = Path(sp_str)
+                    for pattern in ("*.pth", "*.egg-link"):
+                        for f in sp.glob(pattern):
+                            try:
+                                content = f.read_text()
+                                if "swebench_worktrees" in content or str(work_dir) in content:
+                                    f.unlink()
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+
             # Remove from tracking dict
             self._work_dirs.pop(instance_id, None)
 

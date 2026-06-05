@@ -21,7 +21,7 @@ import sys
 
 CODE_DIR = os.environ.get(
     "MAS_ENERGY_CODE",
-    f"/atlas2/u/{os.environ.get('USER', 'vincewu8')}/mas_project/mas-energy/code",
+    f"/atlas2/u/{os.environ['USER']}/mas_project/mas-energy/code",
 )
 sys.path.insert(0, CODE_DIR)
 

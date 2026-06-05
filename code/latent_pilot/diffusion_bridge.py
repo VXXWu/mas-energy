@@ -57,7 +57,10 @@ class CosineNoiseSchedule:
         self.alpha = 1.0 - self.beta
 
     def q_sample(self, x0: torch.Tensor, t: torch.Tensor, noise: torch.Tensor) -> torch.Tensor:
-        ab = self.alpha_bar.to(x0.device)[t].view(-1, *([1] * (x0.dim() - 1)))
+        # alpha_bar is stored in float32; cast to x0's dtype so the mul/add
+        # below doesn't upcast bf16 inputs to float32 (which then mismatches
+        # the model's bf16 weights downstream).
+        ab = self.alpha_bar.to(x0.device, dtype=x0.dtype)[t].view(-1, *([1] * (x0.dim() - 1)))
         return ab.sqrt() * x0 + (1 - ab).sqrt() * noise
 
     def sampling_timesteps(self, K: int) -> torch.Tensor:
@@ -84,7 +87,12 @@ class TimestepEmbed(nn.Module):
         )
 
     def forward(self, t: torch.Tensor) -> torch.Tensor:
-        # t: (B,) integer timestep indices
+        # t: (B,) integer timestep indices.
+        # Sinusoidal positions are computed in float32 for precision (sin/cos
+        # of small floats), then cast to the projection's parameter dtype
+        # before the Linear so we don't trip dtype-mismatch when the module
+        # is moved to bfloat16/float16 via .to(dtype). Bug surfaced on the
+        # cluster smoke run, 2026-05-30.
         half = self.d_model // 2
         freqs = torch.exp(
             -math.log(10000.0) *
@@ -94,6 +102,8 @@ class TimestepEmbed(nn.Module):
         emb = torch.cat([torch.sin(args), torch.cos(args)], dim=-1)
         if emb.size(-1) < self.d_model:
             emb = F.pad(emb, (0, self.d_model - emb.size(-1)))
+        # Match the projection's dtype (the module may have been cast to bf16)
+        emb = emb.to(self.proj[0].weight.dtype)
         return self.proj(emb)
 
 
@@ -367,7 +377,9 @@ class DiffusionBridge(nn.Module):
                             dtype=source.dtype, generator=generator)
 
         ts = self.schedule.sampling_timesteps(K).to(device)
-        ab = self.schedule.alpha_bar.to(device)
+        # Cast alpha_bar to source.dtype to avoid bf16 → float32 upcast in
+        # the reverse-step math below (same fix as in q_sample).
+        ab = self.schedule.alpha_bar.to(device, dtype=source.dtype)
 
         for i in range(len(ts)):
             t = ts[i]

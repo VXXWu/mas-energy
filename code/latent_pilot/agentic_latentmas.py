@@ -31,15 +31,24 @@ import torch
 
 # Add LatentMAS repo to path
 REPO_DIR = os.environ.get("LATENTMAS_REPO",
-    str(Path(f"/atlas2/u/{os.environ.get('USER', 'vincewu8')}/mas_project/LatentMAS")))
+    str(Path(f"/atlas2/u/{os.environ['USER']}/mas_project/LatentMAS")))
 sys.path.insert(0, REPO_DIR)
 
 # Add mas-energy code to path
 CODE_DIR = os.environ.get("MAS_ENERGY_CODE",
-    str(Path(f"/atlas2/u/{os.environ.get('USER', 'vincewu8')}/mas_project/mas-energy/code")))
+    str(Path(f"/atlas2/u/{os.environ['USER']}/mas_project/mas-energy/code")))
 sys.path.insert(0, CODE_DIR)
 
-from models import ModelWrapper  # from LatentMAS repo
+# The LatentMAS repo's ModelWrapper was never actually instantiated by this
+# module — only used as a type annotation. Runtime uses SimpleModelWrapper
+# (an inline class in main()) which only needs torch + transformers.
+# Try importing ModelWrapper for type-correctness; fall back to a sentinel
+# string if the LatentMAS repo isn't on PYTHONPATH (e.g. running in
+# mas-energy env, which has SGLang + working torch but no LatentMAS install).
+try:
+    from models import ModelWrapper  # from LatentMAS repo
+except ImportError:
+    ModelWrapper = "ModelWrapper"  # forward-ref sentinel; never instantiated
 
 # Benchmark imports — loaded dynamically based on --benchmark flag
 def load_benchmark(name, data_dir=None):
@@ -99,12 +108,26 @@ def build_sas_prompt(question: str) -> list[dict]:
 
 def build_react_prompt(question: str, tool_instruction: str = None) -> list[dict]:
     """Build chat messages for a debate agent (Phase 1/2 of decentralized
-    or latent topologies). Uses the main study's DEBATE_AGENT_PROMPT. The
-    tool_instruction arg is kept for call-site compatibility but ignored;
-    TOOL_FORMAT_INSTRUCTION is always appended.
+    or latent topologies). Uses the main study's DEBATE_AGENT_PROMPT.
+
+    NOTE 2026-06-04: history of this function:
+    - Originally appended QAMPARI-style TOOL_FORMAT_INSTRUCTION
+      ("BM25 passages from the corpus") to system prompt unconditionally.
+    - 2026-06-03 morning: removed the instruction entirely, hoping the
+      chat template's native tool schema would suffice. Wrong: HF
+      transformers has no `tool_choice="auto"` equivalent, so the model
+      defaulted to answering from parametric knowledge instead of
+      searching. text MAS F1 stayed at 0.506 (no improvement).
+    - 2026-06-04: re-added the instruction, but with benchmark-agnostic
+      wording (TOOL_FORMAT_INSTRUCTION below). The chat template injects
+      the tool *schema*, this instruction provides the prose nudge that
+      SGLang's tool_choice param provides in the main study. Combined,
+      they should match SGLang's prompt-the-model-to-use-tools behavior.
+    The `tool_instruction` arg is preserved for call-site compat but ignored.
     """
     return [
-        {"role": "system", "content": f"{DEBATE_AGENT_PROMPT}\n\n{TOOL_FORMAT_INSTRUCTION}"},
+        {"role": "system",
+         "content": f"{DEBATE_AGENT_PROMPT}\n\n{TOOL_FORMAT_INSTRUCTION}"},
         {"role": "user", "content": question},
     ]
 
@@ -167,7 +190,14 @@ def generate_text(model_wrapper, messages, temperature: float = 0.0,
         messages, tokenize=False, add_generation_prompt=True,
         enable_thinking=False,
     )
-    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=4096)
+    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=89292)
+    eos_ids = []
+    if tokenizer.eos_token_id is not None:
+        eos_ids.append(tokenizer.eos_token_id)
+    for _tok in ("<|im_end|>", "<|endoftext|>"):
+        _tid = tokenizer.convert_tokens_to_ids(_tok)
+        if _tid is not None and _tid != tokenizer.unk_token_id and _tid not in eos_ids:
+            eos_ids.append(_tid)
     gen_kwargs = dict(
         input_ids=enc.input_ids.to(dev),
         attention_mask=enc.attention_mask.to(dev),
@@ -175,6 +205,10 @@ def generate_text(model_wrapper, messages, temperature: float = 0.0,
         do_sample=(temperature > 0),
         temperature=temperature if temperature > 0 else 1.0,
         top_p=0.95 if temperature > 0 else 1.0,
+        eos_token_id=eos_ids if eos_ids else None,
+        pad_token_id=(tokenizer.pad_token_id
+                      if tokenizer.pad_token_id is not None
+                      else tokenizer.eos_token_id),
     )
     if constrain_list:
         # Stop at paragraph-break / prose-introduction markers. The model
@@ -185,21 +219,42 @@ def generate_text(model_wrapper, messages, temperature: float = 0.0,
         gen_kwargs["tokenizer"] = tokenizer  # required for stop_strings
     with torch.no_grad():
         out = model.generate(**gen_kwargs)
-    return tokenizer.decode(out[0, enc.input_ids.shape[1]:], skip_special_tokens=True)
+    response = tokenizer.decode(out[0, enc.input_ids.shape[1]:], skip_special_tokens=True)
+    import re as _re
+    response = _re.sub(r'<think>.*?</think>', '', response, flags=_re.DOTALL)
+    if "<|im_end|>" in response:
+        response = response.split("<|im_end|>", 1)[0]
+    return response.strip()
 
 
 # Format spec only — no directive ("MUST use"/"Do NOT"/"multiple searches")
 # that would diverge from main study's prompts. The main study's prompts
 # handle behavior; tool format is just a technical necessity for HF.
+# Tool-format instruction (NEW 2026-06-04, replaces QAMPARI-specific version).
+# Why this exists: the main study uses SGLang with `tool_choice="auto"` on every
+# chat.completions.create() call, which actively prompts the model to either
+# emit a tool call OR a final answer. HF transformers has no equivalent
+# parameter — apply_chat_template(tools=...) only injects the tool schema
+# *passively*. Without explicit prose telling the model "you should call
+# these tools", Qwen3.5-9B reliably defaults to answering from parametric
+# knowledge instead of searching, producing F1 ~= chance on FanOutQA.
+#
+# The instruction is benchmark-agnostic — it references "the tools shown
+# above" (which the chat template will have injected), not specific tool
+# names or descriptions, so it works equally for FanOutQA Wikipedia search,
+# QAMPARI BM25 corpus, BrowseComp dense index, etc.
 TOOL_FORMAT_INSTRUCTION = (
-    "Available tool: search(query: str) — returns top BM25 passages from "
-    "the corpus.\n"
-    "To call the tool, emit:\n"
-    '<tool_call>\n{"name": "search", "arguments": {"query": "your query"}}\n</tool_call>'
+    "Your training data may be outdated or incomplete. For factual questions, "
+    "always investigate using the tools shown above before answering. "
+    "Emit tool calls as <tool_call>{...}</tool_call> blocks containing JSON "
+    "with the tool name and arguments. Use multiple tool calls if needed to "
+    "gather complete evidence. Only after receiving tool results should you "
+    "synthesize a final answer."
 )
 
 # Backwards-compatibility alias; existing call sites pass this as a second
-# arg to build_react_prompt, which now ignores the arg.
+# arg to build_react_prompt, which now uses it again (with the corrected
+# benchmark-agnostic wording above).
 TOOL_INSTRUCTION = TOOL_FORMAT_INSTRUCTION
 
 
@@ -216,6 +271,12 @@ def detect_tool_call(text: str):
        search("query text")
     """
     import re
+    # Native-tool-calling assistant turns carry content=None when they only
+    # emit tool_calls (per OpenAI message format). _extract_tool_summary
+    # iterates over messages and feeds each .content to this function, so
+    # we have to handle None / non-string up front.
+    if not isinstance(text, str) or not text:
+        return None
     # Strip <think> blocks
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     text = re.sub(r'<think>.*$', '', text, flags=re.DOTALL)
@@ -260,13 +321,98 @@ def detect_tool_call(text: str):
     return None
 
 
+# ────────────────────────────────────────────────────────────────────
+# Message-level soft truncation — ported byte-for-byte from main study's
+# `llm._truncate_messages`. Drops oldest tool_calling rounds when prompt
+# exceeds budget; preserves system + first user + most recent messages.
+# Identical strategy to what SGLang sees in the main study so the pilot's
+# Phase 2 inputs are structurally equivalent at all input sizes.
+# ────────────────────────────────────────────────────────────────────
+
+_CHARS_PER_TOKEN = 3  # matches main study llm.py:41
+
+
+def _estimate_msg_tokens(messages):
+    """Rough token count, matches main study llm._estimate_tokens exactly."""
+    total = 0
+    for m in messages:
+        content = m.get("content") or ""
+        total += len(content) // _CHARS_PER_TOKEN + 4
+        for tc in m.get("tool_calls", []):
+            fn = tc.get("function", {})
+            total += len(fn.get("arguments", "")) // _CHARS_PER_TOKEN + 10
+    return total
+
+
+def _soft_truncate_messages(messages, max_context_tokens=98304, max_generation=4096):
+    """Port of main study's llm._truncate_messages. Reserves 5% safety margin
+    beyond max_generation; effective prompt budget = int(ctx * 0.95) - gen.
+
+    With defaults (ctx=98304, gen=4096): budget = 89292 — identical to main
+    study's effective input limit on its SGLang server.
+
+    Preserves: system message, first user message, most recent messages.
+    Drops oldest assistant(tool_calls) + tool result groups from the middle.
+    """
+    available = int(max_context_tokens * 0.95) - max_generation
+    if _estimate_msg_tokens(messages) <= available:
+        return messages
+
+    # Parse into segments: tool_round groups and other singletons.
+    segments = []
+    i = 0
+    while i < len(messages):
+        msg = messages[i]
+        if msg.get("role") == "assistant" and msg.get("tool_calls"):
+            group = [msg]
+            j = i + 1
+            while j < len(messages) and messages[j].get("role") == "tool":
+                group.append(messages[j])
+                j += 1
+            segments.append(("tool_round", group))
+            i = j
+        else:
+            segments.append(("other", [msg]))
+            i += 1
+
+    prefix_count = min(2, len(segments))
+    prefix_segs = segments[:prefix_count]
+    rest_segs = list(segments[prefix_count:])
+
+    while rest_segs:
+        flat = [m for _, seg_msgs in prefix_segs + rest_segs for m in seg_msgs]
+        if _estimate_msg_tokens(flat) <= available:
+            break
+        # Drop the oldest tool_round from rest
+        dropped = False
+        for idx, (seg_type, _) in enumerate(rest_segs):
+            if seg_type == "tool_round":
+                rest_segs.pop(idx)
+                dropped = True
+                break
+        if not dropped:
+            rest_segs.pop(0)
+
+    return [m for _, seg_msgs in prefix_segs + rest_segs for m in seg_msgs]
+
+
 def text_react_loop(model_wrapper: ModelWrapper, messages: list[dict],
                     executor, max_steps: int = 5, temperature: float = 0.5,
                     skip_final_response: bool = False,
-                    capture_kv: bool = False):
+                    capture_kv: bool = False,
+                    tools: list[dict] | None = None):
     """Run a text ReAct loop using LatentMAS's ModelWrapper.
 
     Mutates `messages` in place (appends tool calls, results, responses).
+
+    Args:
+        tools: if provided, use the model's native chat template with tools=
+            and parse <tool_call>...</tool_call> blocks from the response.
+            Tool results are appended as proper {role: tool, ...} messages.
+            This matches the main study's `llm.react_loop` protocol.
+            If None, falls back to the legacy regex-on-text + fake user-role
+            "Tool result: ... Continue." pattern (kept for backward compat
+            with non-tool callers like the synthesis pass).
 
     Returns:
       - str (response text) when capture_kv=False
@@ -280,14 +426,62 @@ def text_react_loop(model_wrapper: ModelWrapper, messages: list[dict],
     """
     tokenizer = model_wrapper.tokenizer
     last_kv = None
+    use_native = tools is not None
+    valid_tool_names = ({t["function"]["name"] for t in tools}
+                        if use_native else set())
+    # Native-tool parsing (matches main study and SGLang qwen3_coder parser).
+    if use_native:
+        from latent_pilot.native_react import (
+            _parse_tool_calls, _content_outside_tool_calls,
+        )
+
+    # Truncation cap for ReAct prompt — matched EXACTLY to the main study:
+    # SGLang launches with --context-length 98304, and llm._truncate_messages
+    # reserves 95% of context minus MAX_TOKENS (=4096) → effective prompt cap
+    # of 89292 tokens. This makes the pilot text_react_loop's prompt budget
+    # identical to the main study's react_loop. (Earlier hard limit of 4096
+    # was the dominant cause of the pilot's 0.07 F1 underperformance vs main
+    # study on FanOutQA debate rounds where Phase 2 inputs exceed 4k tokens.)
+    REACT_PROMPT_TOKEN_CAP = 89292
+
+    def _tokenize_left_trunc(prompt_str):
+        """Tokenize and left-truncate (drop OLDEST tokens) so the generation
+        prompt at the end of the chat template is always preserved. Default
+        HF truncation drops from the right, which would silently chop the
+        generation prompt — never what we want for ReAct."""
+        enc = tokenizer(prompt_str, return_tensors="pt", truncation=False)
+        if enc.input_ids.size(1) > REACT_PROMPT_TOKEN_CAP:
+            enc["input_ids"] = enc.input_ids[:, -REACT_PROMPT_TOKEN_CAP:]
+            enc["attention_mask"] = enc.attention_mask[:, -REACT_PROMPT_TOKEN_CAP:]
+        return enc
 
     for step in range(max_steps):
-        prompt = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True,
-            enable_thinking=False,
-        )
-        enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=4096)
+        tmpl_kwargs = dict(tokenize=False, add_generation_prompt=True,
+                           enable_thinking=False)
+        if use_native:
+            tmpl_kwargs["tools"] = tools
+        # Spec-matched truncation: apply message-level soft truncation FIRST
+        # (mirrors main study's `_truncate_messages` call before chat()).
+        # This preserves system + first user + most recent messages by dropping
+        # oldest tool_call rounds — identical strategy to main study.
+        # The token-level _tokenize_left_trunc is a safety net for the residual.
+        messages = _soft_truncate_messages(messages,
+                                           max_context_tokens=98304,
+                                           max_generation=4096)
+        prompt = tokenizer.apply_chat_template(messages, **tmpl_kwargs)
+        enc = _tokenize_left_trunc(prompt)
         input_ids = enc.input_ids.to(model_wrapper.model.device)
+
+        # Build EOS token list. For Qwen3.5 with native thinking-mode prefix,
+        # the model's normal eos_token isn't enough — it can emit <|im_end|>
+        # without setting eos_token_id and run on past it. Catch both.
+        eos_ids = []
+        if tokenizer.eos_token_id is not None:
+            eos_ids.append(tokenizer.eos_token_id)
+        for tok in ("<|im_end|>", "<|endoftext|>"):
+            tid = tokenizer.convert_tokens_to_ids(tok)
+            if tid is not None and tid != tokenizer.unk_token_id and tid not in eos_ids:
+                eos_ids.append(tid)
 
         gen_kwargs = dict(
             input_ids=input_ids,
@@ -296,6 +490,10 @@ def text_react_loop(model_wrapper: ModelWrapper, messages: list[dict],
             do_sample=(temperature > 0),
             temperature=temperature if temperature > 0 else 1.0,
             top_p=0.95 if temperature > 0 else 1.0,
+            eos_token_id=eos_ids if eos_ids else None,
+            pad_token_id=(tokenizer.pad_token_id
+                          if tokenizer.pad_token_id is not None
+                          else tokenizer.eos_token_id),
         )
         if capture_kv:
             gen_kwargs["return_dict_in_generate"] = True
@@ -310,27 +508,92 @@ def text_react_loop(model_wrapper: ModelWrapper, messages: list[dict],
         else:
             response = tokenizer.decode(out[0, input_ids.shape[1]:], skip_special_tokens=True)
 
-        tool = detect_tool_call(response)
-        if tool is None:
-            if skip_final_response:
+        # Strip <think>...</think> blocks from the visible response (Qwen3.5
+        # with thinking mode emits these; we want the post-thinking content).
+        # Also defensively trim anything past the first <|im_end|> just in case.
+        import re as _re
+        response = _re.sub(r'<think>.*?</think>', '', response, flags=_re.DOTALL)
+        if "<|im_end|>" in response:
+            response = response.split("<|im_end|>", 1)[0]
+        response = response.strip()
+
+        if use_native:
+            # Native path: parse <tool_call>...</tool_call> blocks, append
+            # proper {role: tool, ...} messages. Matches main study format.
+            tool_calls = _parse_tool_calls(response)
+            real_calls = [tc for tc in tool_calls
+                          if tc["name"] in valid_tool_names]
+            content_part = _content_outside_tool_calls(response)
+            if not real_calls:
+                if skip_final_response:
+                    if capture_kv:
+                        return "", last_kv
+                    return ""
+                final = response.strip() if not tool_calls else content_part
+                messages.append({"role": "assistant", "content": final})
                 if capture_kv:
-                    return "", last_kv
-                return ""
+                    return final, last_kv
+                return final
+            assistant_turn = {
+                "role": "assistant",
+                "content": content_part or None,
+                "tool_calls": [
+                    {
+                        "id": f"call_{step}_{i}",
+                        "type": "function",
+                        "function": {
+                            "name": tc["name"],
+                            "arguments": (json.dumps(tc["arguments"])
+                                          if isinstance(tc["arguments"], dict)
+                                          else str(tc["arguments"])),
+                        },
+                    }
+                    for i, tc in enumerate(real_calls)
+                ],
+            }
+            messages.append(assistant_turn)
+            for i, tc in enumerate(real_calls):
+                args = tc["arguments"]
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except json.JSONDecodeError:
+                        args = {"raw": args}
+                try:
+                    result = executor(tc["name"], args)
+                except Exception as e:
+                    result = f"Error executing {tc['name']}: {e}"
+                if not isinstance(result, str):
+                    result = json.dumps(result, default=str)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": f"call_{step}_{i}",
+                    "name": tc["name"],
+                    "content": result,
+                })
+        else:
+            # Legacy regex-parse path. Kept for callers that don't pass tools.
+            tool = detect_tool_call(response)
+            if tool is None:
+                if skip_final_response:
+                    if capture_kv:
+                        return "", last_kv
+                    return ""
+                messages.append({"role": "assistant", "content": response})
+                if capture_kv:
+                    return response, last_kv
+                return response
+
+            tool_name, tool_args = tool
+            if isinstance(tool_args, str):
+                try:
+                    tool_args = json.loads(tool_args)
+                except json.JSONDecodeError:
+                    tool_args = {"query": tool_args}
+
+            result = executor(tool_name, tool_args)
             messages.append({"role": "assistant", "content": response})
-            if capture_kv:
-                return response, last_kv
-            return response
-
-        tool_name, tool_args = tool
-        if isinstance(tool_args, str):
-            try:
-                tool_args = json.loads(tool_args)
-            except json.JSONDecodeError:
-                tool_args = {"query": tool_args}
-
-        result = executor(tool_name, tool_args)
-        messages.append({"role": "assistant", "content": response})
-        messages.append({"role": "user", "content": f"Tool result:\n{result}\n\nContinue."})
+            messages.append({"role": "user", "content": f"Tool result:\n{result}\n\nContinue."})
 
     if skip_final_response:
         if capture_kv:
@@ -342,12 +605,24 @@ def text_react_loop(model_wrapper: ModelWrapper, messages: list[dict],
         messages + [{"role": "user", "content": "Provide your final answer now as a comma-separated list."}],
         tokenize=False, add_generation_prompt=True, enable_thinking=False,
     )
-    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=4096)
+    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=89292)
+
+    eos_ids = []
+    if tokenizer.eos_token_id is not None:
+        eos_ids.append(tokenizer.eos_token_id)
+    for tok in ("<|im_end|>", "<|endoftext|>"):
+        tid = tokenizer.convert_tokens_to_ids(tok)
+        if tid is not None and tid != tokenizer.unk_token_id and tid not in eos_ids:
+            eos_ids.append(tid)
 
     gen_kwargs = dict(
         input_ids=enc.input_ids.to(model_wrapper.model.device),
         attention_mask=enc.attention_mask.to(model_wrapper.model.device),
         max_new_tokens=4096, do_sample=False,
+        eos_token_id=eos_ids if eos_ids else None,
+        pad_token_id=(tokenizer.pad_token_id
+                      if tokenizer.pad_token_id is not None
+                      else tokenizer.eos_token_id),
     )
     if capture_kv:
         gen_kwargs["return_dict_in_generate"] = True
@@ -356,8 +631,17 @@ def text_react_loop(model_wrapper: ModelWrapper, messages: list[dict],
         out = model_wrapper.model.generate(**gen_kwargs)
 
     if capture_kv:
-        return tokenizer.decode(out.sequences[0, enc.input_ids.shape[1]:], skip_special_tokens=True), out.past_key_values
-    return tokenizer.decode(out[0, enc.input_ids.shape[1]:], skip_special_tokens=True)
+        response = tokenizer.decode(out.sequences[0, enc.input_ids.shape[1]:], skip_special_tokens=True)
+    else:
+        response = tokenizer.decode(out[0, enc.input_ids.shape[1]:], skip_special_tokens=True)
+    import re as _re
+    response = _re.sub(r'<think>.*?</think>', '', response, flags=_re.DOTALL)
+    if "<|im_end|>" in response:
+        response = response.split("<|im_end|>", 1)[0]
+    response = response.strip()
+    if capture_kv:
+        return response, out.past_key_values
+    return response
 
 
 _WE_ALIGNMENT_CACHE = None
@@ -407,7 +691,17 @@ def latent_react_loop(model_wrapper: ModelWrapper, messages: list[dict],
     tokenizer = model_wrapper.tokenizer
     model = model_wrapper.model
     dev = model.device
-    eos = tokenizer.eos_token_id
+    # Set of stop tokens. Qwen3.5's eos_token_id is sometimes <|endoftext|>
+    # while the chat-template turn boundary is <|im_end|>; manual decode
+    # loops below stop only if tok_id is in this set, catching either.
+    eos_token_ids = set()
+    if tokenizer.eos_token_id is not None:
+        eos_token_ids.add(tokenizer.eos_token_id)
+    for _tok in ("<|im_end|>", "<|endoftext|>"):
+        _tid = tokenizer.convert_tokens_to_ids(_tok)
+        if _tid is not None and _tid != tokenizer.unk_token_id:
+            eos_token_ids.add(_tid)
+    eos = tokenizer.eos_token_id  # back-compat for the variable name
     MAX_RESPONSE_TOKENS = 4096
 
     for step in range(max_steps):
@@ -415,7 +709,7 @@ def latent_react_loop(model_wrapper: ModelWrapper, messages: list[dict],
             messages, tokenize=False, add_generation_prompt=True,
             enable_thinking=False,
         )
-        enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=4096)
+        enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=89292)
         input_ids = enc.input_ids.to(dev)
 
         with torch.no_grad():
@@ -457,7 +751,7 @@ def latent_react_loop(model_wrapper: ModelWrapper, messages: list[dict],
             else:
                 next_token = logits.argmax(dim=-1, keepdim=True)
             tok_id = next_token[0, 0].item()
-            if tok_id == eos:
+            if tok_id in eos_token_ids:
                 break
             generated.append(tok_id)
 
@@ -490,7 +784,7 @@ def latent_react_loop(model_wrapper: ModelWrapper, messages: list[dict],
     prompt = tokenizer.apply_chat_template(
         messages, tokenize=False, add_generation_prompt=True, enable_thinking=False,
     )
-    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=4096)
+    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=89292)
     with torch.no_grad():
         gen = model.generate(
             input_ids=enc.input_ids.to(dev),
@@ -519,7 +813,7 @@ def build_working_memory(model_wrapper: ModelWrapper, messages: list[dict],
         messages, tokenize=False, add_generation_prompt=True,
         enable_thinking=False,
     )
-    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=4096)
+    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=89292)
     input_ids = enc.input_ids.to(dev)
 
     if prior_kv is not None:
@@ -702,7 +996,8 @@ def run_text_parallel_decentralized(model_wrapper, question, executor,
                                      enable_agreement_skip=False,
                                      agreement_threshold=0.5,
                                      enable_tool_cache=False,
-                                     enable_grammar=False):
+                                     enable_grammar=False,
+                                     tools=None):
     """Text decentralized matching the production topology:
     Phase 1: parallel independent search
     Phase 2: all-to-all text debate (R rounds)
@@ -719,7 +1014,8 @@ def run_text_parallel_decentralized(model_wrapper, question, executor,
     for agent_idx in range(n_agents):
         msgs = build_react_prompt(question, TOOL_INSTRUCTION)
         response = text_react_loop(model_wrapper, msgs, executor,
-                                   max_steps=max_react_steps, temperature=0.5)
+                                   max_steps=max_react_steps, temperature=0.5,
+                                   tools=tools)
         trajectories.append({
             "final_response": response,
             "tool_summary": _extract_tool_summary(msgs),
@@ -749,7 +1045,8 @@ def run_text_parallel_decentralized(model_wrapper, question, executor,
                     {"role": "user", "content": debate_msg}
                 ]
                 response = text_react_loop(model_wrapper, msgs, executor,
-                                           max_steps=max_react_steps, temperature=0.5)
+                                           max_steps=max_react_steps, temperature=0.5,
+                                           tools=tools)
                 new_trajectories.append({
                     "final_response": response,
                     "tool_summary": _extract_tool_summary(msgs),
@@ -790,7 +1087,7 @@ def run_text_parallel_decentralized(model_wrapper, question, executor,
 
 def run_latent_parallel_decentralized(model_wrapper, question, executor,
                                        m_latent=40, n_agents=3, max_react_steps=5,
-                                       n_rounds=1):
+                                       n_rounds=1, tools=None):
     """Latent decentralized: parallel search + sequential latent debate.
 
     Phase 1 (PARALLEL, identical to text): all agents search independently.
@@ -809,7 +1106,8 @@ def run_latent_parallel_decentralized(model_wrapper, question, executor,
     for agent_idx in range(n_agents):
         msgs = build_react_prompt(question, TOOL_INSTRUCTION)
         response = text_react_loop(model_wrapper, msgs, executor,
-                                   max_steps=max_react_steps, temperature=0.5)
+                                   max_steps=max_react_steps, temperature=0.5,
+                                   tools=tools)
         agent_msgs_list.append(msgs)
         agent_responses.append(response)
 
@@ -873,7 +1171,7 @@ def run_cocunut_synthesis(model_wrapper, messages, m_latent,
     prompt = tokenizer.apply_chat_template(
         messages, tokenize=False, add_generation_prompt=True, enable_thinking=False,
     )
-    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=4096)
+    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=89292)
     input_ids = enc.input_ids.to(dev)
 
     with torch.no_grad():
@@ -901,7 +1199,17 @@ def run_cocunut_synthesis(model_wrapper, messages, m_latent,
     else:
         next_token = logits.argmax(dim=-1, keepdim=True)
     generated = [next_token[0, 0].item()]
-    eos = tokenizer.eos_token_id
+    # Set of stop tokens. Qwen3.5's eos_token_id is sometimes <|endoftext|>
+    # while the chat-template turn boundary is <|im_end|>; manual decode
+    # loops below stop only if tok_id is in this set, catching either.
+    eos_token_ids = set()
+    if tokenizer.eos_token_id is not None:
+        eos_token_ids.add(tokenizer.eos_token_id)
+    for _tok in ("<|im_end|>", "<|endoftext|>"):
+        _tid = tokenizer.convert_tokens_to_ids(_tok)
+        if _tid is not None and _tid != tokenizer.unk_token_id:
+            eos_token_ids.add(_tid)
+    eos = tokenizer.eos_token_id  # back-compat for the variable name
 
     for _ in range(max_new_tokens - 1):
         with torch.no_grad():
@@ -915,7 +1223,7 @@ def run_cocunut_synthesis(model_wrapper, messages, m_latent,
         else:
             next_token = logits.argmax(dim=-1, keepdim=True)
         tok_id = next_token[0, 0].item()
-        if tok_id == eos:
+        if tok_id in eos_token_ids:
             break
         generated.append(tok_id)
 
@@ -1211,7 +1519,7 @@ def text_react_with_memory(model_wrapper, messages, executor, past_kv,
             messages, tokenize=False, add_generation_prompt=True,
             enable_thinking=False,
         )
-        enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=4096)
+        enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=89292)
         input_ids = enc.input_ids.to(dev)
 
         gen_kwargs = dict(
@@ -1259,7 +1567,7 @@ def text_react_with_memory(model_wrapper, messages, executor, past_kv,
     messages.append({"role": "user", "content": "Provide your final answer as a comma-separated list."})
     prompt = tokenizer.apply_chat_template(messages, tokenize=False,
                                            add_generation_prompt=True, enable_thinking=False)
-    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=4096)
+    enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=89292)
     with torch.no_grad():
         out = model.generate(input_ids=enc.input_ids.to(dev),
                             attention_mask=enc.attention_mask.to(dev),
@@ -1293,6 +1601,10 @@ def main():
     ap.add_argument("--n-tasks", type=int, default=30)
     ap.add_argument("--m-latent", type=int, default=40)
     ap.add_argument("--max-react-steps", type=int, default=5)
+    ap.add_argument("--n-rounds", type=int, default=1,
+                    help="Debate rounds for decentralized topology. Main study "
+                         "uses 2 (config.py DECENTRALIZED_ROUNDS); pilot historically "
+                         "hardcoded 1 which capped text-MAS strength.")
     ap.add_argument("--n-agents", type=int, default=3)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--model-name", type=str, default="Qwen/Qwen3-8B")
@@ -1325,7 +1637,7 @@ def main():
     args = ap.parse_args()
 
     # Output setup
-    out_dir = Path(f"/atlas2/u/{os.environ.get('USER', 'vincewu8')}/mas_project/mas-energy/results/latent_pilot")
+    out_dir = Path(f"/atlas2/u/{os.environ['USER']}/mas_project/mas-energy/results/latent_pilot")
     out_dir.mkdir(parents=True, exist_ok=True)
     reencode_tag = "_noreencode" if args.no_reencode else ""
     mode_tag = f"_{args.latent_mode}" if args.latent_mode != "kv_share" else ""
@@ -1428,12 +1740,13 @@ def main():
                 mw, question, executor,
                 n_agents=args.n_agents,
                 max_react_steps=args.max_react_steps,
-                n_rounds=1,
+                n_rounds=args.n_rounds,
                 metadata_out=text_meta,
                 enable_agreement_skip=args.enable_agreement_skip,
                 agreement_threshold=args.agreement_threshold,
                 enable_tool_cache=args.enable_tool_cache,
                 enable_grammar=args.enable_grammar,
+                tools=bench.get_tools() if hasattr(bench, "get_tools") else None,
             )
             text_rec = em.stop(metadata={"condition": "text_mas"})
             text_acc, text_f1_val, text_eval = evaluate_fn(task, text_ans)
@@ -1445,19 +1758,20 @@ def main():
                 latent_ans = run_phase1_latent_parallel_decentralized(
                     mw, question, executor,
                     m_latent=args.m_latent, n_agents=args.n_agents,
-                    max_react_steps=args.max_react_steps, n_rounds=1,
+                    max_react_steps=args.max_react_steps, n_rounds=args.n_rounds,
                 )
             elif args.latent_mode == "cocunut":
                 latent_ans = run_cocunut_parallel_decentralized(
                     mw, question, executor,
                     m_latent=args.m_latent, n_agents=args.n_agents,
-                    max_react_steps=args.max_react_steps, n_rounds=1,
+                    max_react_steps=args.max_react_steps, n_rounds=args.n_rounds,
                 )
             else:
                 latent_ans = run_latent_parallel_decentralized(
                     mw, question, executor,
                     m_latent=args.m_latent, n_agents=args.n_agents,
-                    max_react_steps=args.max_react_steps, n_rounds=1,
+                    max_react_steps=args.max_react_steps, n_rounds=args.n_rounds,
+                    tools=bench.get_tools() if hasattr(bench, "get_tools") else None,
                 )
             latent_rec = em.stop(metadata={"condition": f"latent_mas_{args.latent_mode}"})
             latent_acc, latent_f1_val, latent_eval = evaluate_fn(task, latent_ans)

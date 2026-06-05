@@ -235,7 +235,12 @@ def eval_endtoend_kl(backbone, embed_layer, bridge, eval_loader, layer_indices,
                                use_cache=False)
         T = tgt.size(1)
         P = pid.size(1)
-        teacher_logits = teacher_out.logits[:, P-1:P-1+T, :]
+        teacher_logits = teacher_out.logits[:, P-1:P-1+T, :].detach()
+        # Free the full teacher forward graph immediately — we only need the
+        # sliced logits going forward.
+        del teacher_out
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         # Student path: bridge soft prompt + target embeddings
         soft = bridge.sample(source, task, K=K_sample)             # (B, k, d)
@@ -248,14 +253,31 @@ def eval_endtoend_kl(backbone, embed_layer, bridge, eval_loader, layer_indices,
         student_out = backbone(inputs_embeds=full_embeds,
                                attention_mask=student_mask, use_cache=False)
         k = soft.size(1)
-        student_logits = student_out.logits[:, k-1:k-1+T, :]
+        student_logits = student_out.logits[:, k-1:k-1+T, :].detach()
+        del student_out
 
-        teacher_lp = F.log_softmax(teacher_logits, dim=-1)
-        student_lp = F.log_softmax(student_logits, dim=-1)
-        kl = F.kl_div(student_lp, teacher_lp.exp(), reduction="none").sum(-1)
-        # Mask out padding positions of target
-        kl = (kl * tgt_mask).sum() / tgt_mask.sum().clamp(min=1)
-        kl_vals.append(kl.item())
+        # Compute KL chunked along the sequence dimension. Qwen3.5-9B has vocab
+        # 248,320 — a single (B, T, V) softmax tensor at T=128 is ~127 MB and
+        # log_softmax temporarily doubles peak memory. At T=512 the eval OOMs
+        # on a 24G A5000 with the backbone + bridge optimizer state already
+        # resident. Chunking the seq dim keeps peak softmax memory bounded.
+        CHUNK = 32  # rows of T per softmax pass; bounded mem irrespective of T
+        kl_sum = torch.tensor(0.0, device=device)
+        weight_sum = torch.tensor(0.0, device=device)
+        for s in range(0, T, CHUNK):
+            e = min(s + CHUNK, T)
+            t_lp = F.log_softmax(teacher_logits[:, s:e, :], dim=-1)
+            s_lp = F.log_softmax(student_logits[:, s:e, :], dim=-1)
+            kl_chunk = F.kl_div(s_lp, t_lp.exp(), reduction="none").sum(-1)
+            mask_chunk = tgt_mask[:, s:e]
+            kl_sum = kl_sum + (kl_chunk * mask_chunk).sum()
+            weight_sum = weight_sum + mask_chunk.sum()
+            del t_lp, s_lp, kl_chunk
+        kl = (kl_sum / weight_sum.clamp(min=1)).item()
+        kl_vals.append(kl)
+        del teacher_logits, student_logits
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     bridge.train()
     return float(sum(kl_vals) / max(1, len(kl_vals)))

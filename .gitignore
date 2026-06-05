@@ -1,9 +1,80 @@
-# local saved files
+# OS / editor
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+eval_venv/
+.swebench_venv/
+
+# Experimental output (regenerable from code + benchmark data)
+results/
+results copy/
 logs/
-analysis/
-python_checks.md
+
+# Benchmark data caches (large; re-downloaded by setup scripts)
+data/
+hf_cache/
+
+# SWE-bench harness artifacts
+swebench_real_eval_inputs/
+swebench_real_eval_outputs/
+swebench_patches/
+swebench_repos/
+
+# Legacy pareto result subdirs (kept here for historical artifacts)
 results/pareto/
 results/pareto_v2/
 results/pareto_v3/
-# Cluster sbatch scripts (infrastructure, not paper code)
-scripts/
+
+# Local notes / WIP (not for replication)
+python_checks.md
+.deprecated_scripts/
+
+# Shell helpers — contain SSH/scp/rsync commands tied to user's personal
+# cluster account, sync workflow, env-rebuild routines. Replication uses
+# the .sbatch job specs directly via SLURM; setup is documented in README.
+*.sh
+scripts/cluster_commands.md
+
+# Secrets — none expected, but defensive
+.env
+.env.*
+*.key
+*.pem
+openai_key*
+anthropic_key*
+hf_token*
+
+# Local Claude config
+.claude/settings.local.json
+
+# Backup sbatch files (.bak, .bak2, etc) — historical iterations, not for replication
+*.bak
+*.bak[0-9]*
+scripts/archive/
+
+# Latent / diffusion-bridge subproject — lives in a separate fork
+# and is committed independently there. Excluded from this repo's
+# scope to keep the main mas-energy energy-scaling codebase clean.
+code/latent_pilot/
+
+# Analysis / plotting scripts excluded from this repo's scope. Repo
+# tracks only experiment-running code (benchmarks, topologies,
+# run_experiments, llm, energy, prompts) and SLURM job specs. Post-hoc
+# analysis lives elsewhere.
+analysis/

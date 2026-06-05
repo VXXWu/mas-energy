@@ -135,7 +135,14 @@ def main():
                 bench_label = 'math'
             pairs, skipped = extract_pairs(jsonl, bench_label)
             pairs = [p for p in pairs if len(p['target_response']) >= args.min_target_chars]
-            print(f"  {jsonl.relative_to('.')}: {len(pairs)} pairs  skipped={dict(skipped)}")
+            # `relative_to('.')` raises when jsonl isn't under CWD (e.g. when
+            # this extractor is invoked from mas-energy/code while transcripts
+            # live under mas-energy/results). Fall back to absolute path.
+            try:
+                display_path = jsonl.relative_to(Path.cwd())
+            except ValueError:
+                display_path = jsonl
+            print(f"  {display_path}: {len(pairs)} pairs  skipped={dict(skipped)}")
             total_pairs.extend(pairs)
             total_skipped.update(skipped)
             sources_seen.append(str(jsonl))
