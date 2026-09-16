@@ -1,0 +1,104 @@
+{
+  "files": [
+    {
+      "path": "cross_model/cells_3model_swebench.csv",
+      "rows": 177,
+      "bytes": 27574
+    },
+    {
+      "path": "cross_model/cells_all_raw.csv",
+      "rows": 138,
+      "bytes": 23506
+    },
+    {
+      "path": "cross_model/ksweep_3model.csv",
+      "rows": 120,
+      "bytes": 17815
+    },
+    {
+      "path": "cross_model/msweep_3model.csv",
+      "rows": 51,
+      "bytes": 8236
+    },
+    {
+      "path": "cross_model/per_record_master.csv",
+      "rows": 23792,
+      "bytes": 6335865
+    },
+    {
+      "path": "cross_model/rsweep_3model.csv",
+      "rows": 48,
+      "bytes": 7748
+    },
+    {
+      "path": "kxn_grid/kxn_9b.csv",
+      "rows": 314,
+      "bytes": 43708
+    },
+    {
+      "path": "qwen9b_percell/BrowseCompplus_k_sweep.csv",
+      "rows": 40,
+      "bytes": 16684
+    },
+    {
+      "path": "qwen9b_percell/BrowseCompplus_m_sweep.csv",
+      "rows": 15,
+      "bytes": 6802
+    },
+    {
+      "path": "qwen9b_percell/BrowseCompplus_r_sweep.csv",
+      "rows": 16,
+      "bytes": 7281
+    },
+    {
+      "path": "qwen9b_percell/FanOutQA_k_sweep.csv",
+      "rows": 40,
+      "bytes": 17925
+    },
+    {
+      "path": "qwen9b_percell/FanOutQA_m_sweep.csv",
+      "rows": 15,
+      "bytes": 7245
+    },
+    {
+      "path": "qwen9b_percell/FanOutQA_r_sweep.csv",
+      "rows": 16,
+      "bytes": 7705
+    },
+    {
+      "path": "qwen9b_percell/SWE_bench_k_sweep.csv",
+      "rows": 48,
+      "bytes": 21806
+    },
+    {
+      "path": "qwen9b_percell/SWE_bench_m_sweep.csv",
+      "rows": 15,
+      "bytes": 7334
+    },
+    {
+      "path": "qwen9b_percell/SWE_bench_per_record.csv",
+      "rows": 18097,
+      "bytes": 3744382
+    },
+    {
+      "path": "qwen9b_percell/SWE_bench_r_sweep.csv",
+      "rows": 16,
+      "bytes": 7829
+    },
+    {
+      "path": "qwen9b_percell/WorkBench_k_sweep.csv",
+      "rows": 40,
+      "bytes": 17909
+    },
+    {
+      "path": "qwen9b_percell/WorkBench_m_sweep.csv",
+      "rows": 12,
+      "bytes": 5533
+    },
+    {
+      "path": "qwen9b_percell/WorkBench_r_sweep.csv",
+      "rows": 16,
+      "bytes": 7286
+    }
+  ]
+}
