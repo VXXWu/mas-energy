@@ -1,4 +1,4 @@
-benchmark,topology,k,R,N,n_clean,acc_pct,mean_dyn_kJ,mean_total_tokens,acc_field,source_file
+benchmark,topology,k,R,N,n,acc_pct,mean_dyn_kJ,mean_total_tokens,acc_field,source_file
 BrowseCompplus,centralized,1,2,2,50,16.0,20.709,43985.0,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k1_R2_N2.jsonl
 BrowseCompplus,centralized,1,2,3,50,22.0,36.259,70848.9,correct,final_qwen9b_canonical/BrowseCompplus/k_sweep/Qwen_Qwen3.5-9B_centralized_k1_R2.jsonl
 BrowseCompplus,centralized,1,2,5,50,28.0,38.923,123460.4,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k1_R2_N5.jsonl
@@ -13,7 +13,7 @@ BrowseCompplus,centralized,5,2,2,50,40.0,32.182,342416.8,correct,a5000_browsecom
 BrowseCompplus,centralized,5,2,3,50,40.0,50.728,453438.3,correct,final_qwen9b_canonical/BrowseCompplus/k_sweep/Qwen_Qwen3.5-9B_centralized_k5_R2.jsonl
 BrowseCompplus,centralized,5,6,3,50,18.0,101.293,1283860.7,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k5_R6_N3.jsonl
 BrowseCompplus,centralized,6,5,3,50,28.0,89.29,1152617.8,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k6_R5_N3.jsonl
-BrowseCompplus,centralized,7,2,2,29,41.4,31.524,494546.1,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k7_R2_N2.jsonl
+BrowseCompplus,centralized,7,2,2,50,38.0,31.188,504664.8,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k7_R2_N2.jsonl
 BrowseCompplus,centralized,7,2,3,50,36.0,61.682,695518.7,correct,final_qwen9b_canonical/BrowseCompplus/k_sweep/Qwen_Qwen3.5-9B_centralized_k7_R2.jsonl
 BrowseCompplus,centralized,10,2,1,50,38.0,32.07,418652.4,correct,final_qwen9b_canonical/BrowseCompplus/n_sweep/Qwen_Qwen3.5-9B_centralized_k10_R2_N1.jsonl
 BrowseCompplus,centralized,10,2,2,50,36.0,56.174,662319.5,correct,final_qwen9b_canonical/BrowseCompplus/n_sweep/Qwen_Qwen3.5-9B_centralized_k10_R2_N2.jsonl
@@ -25,7 +25,7 @@ BrowseCompplus,centralized,10,3,3,50,30.0,59.613,1005871.2,correct,a5000_browsec
 BrowseCompplus,centralized,15,2,3,50,40.0,55.519,977716.3,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k15_R2_N3.jsonl
 BrowseCompplus,centralized,20,2,3,50,42.0,120.144,1753538.7,correct,final_qwen9b_canonical/BrowseCompplus/k_sweep/Qwen_Qwen3.5-9B_centralized_k20_R2.jsonl
 BrowseCompplus,centralized,30,1,3,50,40.0,29.52,874773.8,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k30_R1_N3.jsonl
-BrowseCompplus,centralized,30,2,2,49,38.8,46.754,1044387.2,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k30_R2_N2.jsonl
+BrowseCompplus,centralized,30,2,2,50,40.0,46.178,1025701.4,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k30_R2_N2.jsonl
 BrowseCompplus,centralized,30,2,3,50,52.0,186.144,2627202.6,correct,final_qwen9b_canonical/BrowseCompplus/k_sweep/Qwen_Qwen3.5-9B_centralized_k30_R2.jsonl
 BrowseCompplus,centralized,50,2,3,50,36.0,240.629,3598425.9,correct,final_qwen9b_canonical/BrowseCompplus/k_sweep/Qwen_Qwen3.5-9B_centralized_k50_R2.jsonl
 BrowseCompplus,decentralized,1,2,2,50,24.0,24.768,51254.6,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k1_R2_N2.jsonl
@@ -48,7 +48,7 @@ BrowseCompplus,decentralized,5,2,3,50,52.0,73.306,657305.1,correct,final_qwen9b_
 BrowseCompplus,decentralized,5,2,4,50,48.0,64.45,552680.3,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k5_R2_N4.jsonl
 BrowseCompplus,decentralized,5,2,5,50,50.0,75.267,667428.5,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k5_R2_N5.jsonl
 BrowseCompplus,decentralized,5,6,3,50,40.0,77.688,743351.1,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k5_R6_N3.jsonl
-BrowseCompplus,decentralized,6,5,3,49,44.9,62.138,687054.6,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k6_R5_N3.jsonl
+BrowseCompplus,decentralized,6,5,3,50,44.0,63.109,687546.5,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k6_R5_N3.jsonl
 BrowseCompplus,decentralized,7,2,2,50,44.0,33.681,421516.2,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k7_R2_N2.jsonl
 BrowseCompplus,decentralized,7,2,3,50,44.0,87.616,910471.3,correct,final_qwen9b_canonical/BrowseCompplus/k_sweep/Qwen_Qwen3.5-9B_decentralized_k7.jsonl
 BrowseCompplus,decentralized,7,2,4,50,48.0,62.168,711355.2,correct,a5000_browsecomp_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k7_R2_N4.jsonl
@@ -325,7 +325,7 @@ SWE_bench,decentralized,50,2,2,50,36.0,168.208,3590800.2,real_correct,a5000_sweb
 SWE_bench,decentralized,50,2,3,50,40.0,260.407,4962025.9,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k50_R2_N3.jsonl
 SWE_bench,decentralized,50,2,4,50,42.0,319.089,6999111.2,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k50_R2_N4.jsonl
 SWE_bench,decentralized,50,2,5,50,42.0,353.677,8343350.2,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k50_R2_N5.jsonl
-SWE_bench,decentralized,100,2,2,28,42.9,177.021,4143167.2,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k100_R2_N2.jsonl
+SWE_bench,decentralized,100,2,2,50,38.0,276.589,4176384.5,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k100_R2_N2.jsonl
 SWE_bench,decentralized,100,2,3,50,44.0,276.793,6112994.8,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k100_R2_N3.jsonl
 SWE_bench,decentralized,200,2,3,50,54.0,714.832,10577714.4,real_correct,final_qwen9b_canonical/SWE_bench/k_sweep/Qwen_Qwen3.5-9B_decentralized_k200_R2_N3.jsonl
 SWE_bench,independent,1,,2,50,0.0,2.078,6377.6,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_independent_k1_N2.jsonl
@@ -374,9 +374,9 @@ SWE_bench,independent,50,,5,50,34.0,189.227,3425243.5,real_correct,a5000_swebenc
 SWE_bench,independent,60,,3,50,22.0,172.325,2993326.6,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_independent_k60_N3.jsonl
 SWE_bench,independent,100,,2,50,38.0,130.542,3135116.3,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_independent_k100_N2.jsonl
 SWE_bench,independent,100,,3,50,42.0,242.512,5305458.1,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_independent_k100_N3.jsonl
-SWE_bench,independent,100,,4,32,34.4,252.843,6201217.5,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_independent_k100_N4.jsonl
+SWE_bench,independent,100,,4,50,34.0,261.555,6254459.8,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_independent_k100_N4.jsonl
 SWE_bench,independent,200,,3,50,42.0,239.518,5516087.2,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_independent_k200_N3.jsonl
-SWE_bench,independent,200,,4,26,50.0,297.198,7325796.0,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_independent_k200_N4.jsonl
+SWE_bench,independent,200,,4,50,44.0,216.935,7086433.7,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_independent_k200_N4.jsonl
 SWE_bench,sas,1,,1,50,0.0,0.61,2719.3,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_sas_k1_N1.jsonl
 SWE_bench,sas,2,,1,50,0.0,0.978,5644.1,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_sas_k2_N1.jsonl
 SWE_bench,sas,3,,1,50,0.0,1.469,9227.3,real_correct,a5000_swebench_canonical_bf16/Qwen_Qwen3.5-9B_sas_k3_N1.jsonl
@@ -417,7 +417,7 @@ WorkBench,centralized,10,3,3,50,82.0,83.576,279984.2,correct,a5000_workbench_can
 WorkBench,centralized,15,2,3,50,76.0,61.874,188113.7,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k15_R2_N3.jsonl
 WorkBench,centralized,20,2,3,50,80.0,51.831,170451.2,correct,final_qwen9b_canonical/WorkBench/k_sweep/Qwen_Qwen3.5-9B_centralized_k20_R2.jsonl
 WorkBench,centralized,30,1,3,50,76.0,33.311,109383.8,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k30_R1_N3.jsonl
-WorkBench,centralized,30,2,2,38,81.6,36.911,122527.7,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k30_R2_N2.jsonl
+WorkBench,centralized,30,2,2,50,78.0,37.812,135208.9,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_centralized_k30_R2_N2.jsonl
 WorkBench,centralized,30,2,3,50,78.0,47.123,170353.7,correct,final_qwen9b_canonical/WorkBench/k_sweep/Qwen_Qwen3.5-9B_centralized_k30_R2.jsonl
 WorkBench,centralized,50,2,3,50,82.0,58.808,200609.3,correct,final_qwen9b_canonical/WorkBench/k_sweep/Qwen_Qwen3.5-9B_centralized_k50_R2.jsonl
 WorkBench,decentralized,1,2,2,50,26.0,10.288,25993.2,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k1_R2_N2.jsonl
@@ -433,7 +433,7 @@ WorkBench,decentralized,3,2,2,50,74.0,20.637,65492.9,correct,a5000_workbench_can
 WorkBench,decentralized,3,2,3,50,74.0,37.24,137877.9,correct,final_qwen9b_canonical/WorkBench/k_sweep/Qwen_Qwen3.5-9B_decentralized_k3.jsonl
 WorkBench,decentralized,3,2,4,50,80.0,34.227,137823.4,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k3_R2_N4.jsonl
 WorkBench,decentralized,3,2,5,50,82.0,43.473,178641.2,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k3_R2_N5.jsonl
-WorkBench,decentralized,3,10,3,30,83.3,111.855,517836.7,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k3_R10_N3.jsonl
+WorkBench,decentralized,3,10,3,50,80.0,108.615,520583.1,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k3_R10_N3.jsonl
 WorkBench,decentralized,5,2,2,50,84.0,21.077,87607.1,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k5_R2_N2.jsonl
 WorkBench,decentralized,5,2,3,50,86.0,44.809,175056.8,correct,final_qwen9b_canonical/WorkBench/k_sweep/Qwen_Qwen3.5-9B_decentralized_k5.jsonl
 WorkBench,decentralized,5,2,4,50,88.0,43.271,182060.1,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k5_R2_N4.jsonl
@@ -454,7 +454,7 @@ WorkBench,decentralized,15,2,2,50,84.0,24.642,93298.6,correct,a5000_workbench_ca
 WorkBench,decentralized,15,2,3,50,84.0,39.94,147305.5,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k15_R2_N3.jsonl
 WorkBench,decentralized,15,2,4,50,88.0,43.882,203614.7,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k15_R2_N4.jsonl
 WorkBench,decentralized,15,2,5,50,86.0,55.576,274477.1,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k15_R2_N5.jsonl
-WorkBench,decentralized,20,2,2,38,84.2,22.046,84489.1,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k20_R2_N2.jsonl
+WorkBench,decentralized,20,2,2,50,86.0,23.273,96468.9,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k20_R2_N2.jsonl
 WorkBench,decentralized,20,2,3,50,82.0,47.335,197224.9,correct,final_qwen9b_canonical/WorkBench/k_sweep/Qwen_Qwen3.5-9B_decentralized_k20.jsonl
 WorkBench,decentralized,30,1,3,50,78.0,26.133,82107.6,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k30_R1_N3.jsonl
 WorkBench,decentralized,30,2,2,50,86.0,25.574,102613.3,correct,a5000_workbench_canonical_bf16/Qwen_Qwen3.5-9B_decentralized_k30_R2_N2.jsonl
@@ -511,3 +511,12 @@ WorkBench,sas,15,,1,50,76.0,7.152,26059.9,correct,final_qwen9b_canonical/WorkBen
 WorkBench,sas,20,,1,50,76.0,7.153,26059.9,correct,final_qwen9b_canonical/WorkBench/k_sweep/Qwen_Qwen3.5-9B_sas_k20.jsonl
 WorkBench,sas,30,,1,50,76.0,7.152,26059.9,correct,final_qwen9b_canonical/WorkBench/k_sweep/Qwen_Qwen3.5-9B_sas_k30.jsonl
 WorkBench,sas,50,,1,50,76.0,7.15,26059.9,correct,final_qwen9b_canonical/WorkBench/k_sweep/Qwen_Qwen3.5-9B_sas_k50.jsonl
+SWE_bench,independent,100,,5,50,42.0,336.687,7905003.6,real_correct,a5000_swebench_probeBkstar/Qwen_Qwen3.5-9B_independent_k100_N5.jsonl
+SWE_bench,independent,100,,10,50,34.0,644.8,14373558.8,real_correct,a5000_swebench_probeBkstar/Qwen_Qwen3.5-9B_independent_k100_N10.jsonl
+SWE_bench,decentralized,100,2,4,50,36.0,338.733,7796430.5,real_correct,a5000_swebench_probeBkstar/Qwen_Qwen3.5-9B_decentralized_k100_R2_N4.jsonl
+SWE_bench,decentralized,100,2,5,50,36.0,423.589,9627721.9,real_correct,a5000_swebench_probeBkstar/Qwen_Qwen3.5-9B_decentralized_k100_R2_N5.jsonl
+SWE_bench,decentralized,100,2,10,50,40.0,748.491,17341119.2,real_correct,a5000_swebench_probeBkstar/Qwen_Qwen3.5-9B_decentralized_k100_R2_N10.jsonl
+SWE_bench,centralized,100,2,2,50,32.0,175.928,4281153.2,real_correct,a5000_swebench_probe_centstd/Qwen_Qwen3.5-9B_centralized_k100_R2_N2.jsonl
+SWE_bench,centralized,100,2,4,50,44.0,348.791,8437589.3,real_correct,a5000_swebench_probe_centstd/Qwen_Qwen3.5-9B_centralized_k100_R2_N4.jsonl
+SWE_bench,centralized,100,2,5,50,28.0,423.312,10356353.0,real_correct,a5000_swebench_probe_centstd/Qwen_Qwen3.5-9B_centralized_k100_R2_N5.jsonl
+SWE_bench,centralized,100,2,10,50,12.0,804.04,20580354.1,real_correct,a5000_swebench_probe_centstd/Qwen_Qwen3.5-9B_centralized_k100_R2_N10.jsonl
